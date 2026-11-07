@@ -342,6 +342,30 @@
       font-weight: 700;
     }
 
+    .lang-select-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .lang-select-row select {
+      font-size: 1rem;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: #fff;
+      color: var(--text-main, #1a1a1a);
+    }
+
+    .lang-select-note {
+      flex-basis: 100%;
+      margin: 0;
+      font-size: 0.72rem;
+    }
+
     /* Live Transcripts Area */
     .transcript-section {
       display: flex;
@@ -589,6 +613,25 @@
         <span>旅行者の言語：<strong id="travelerLangMemory">自動判別待機中（英語・中国語・韓国語・仏語ほか）</strong></span>
       </div>
 
+      <div class="lang-select-row">
+        <label for="targetLangSelect">相手の言語を固定する：</label>
+        <select id="targetLangSelect">
+          <option value="auto">自動判別（おすすめ）</option>
+          <option value="英語">英語</option>
+          <option value="中国語">中国語</option>
+          <option value="韓国語">韓国語</option>
+          <option value="フランス語">フランス語</option>
+          <option value="スペイン語">スペイン語</option>
+          <option value="ドイツ語">ドイツ語</option>
+          <option value="イタリア語">イタリア語</option>
+          <option value="ポルトガル語">ポルトガル語</option>
+          <option value="ベトナム語">ベトナム語</option>
+          <option value="タイ語">タイ語</option>
+          <option value="インドネシア語">インドネシア語</option>
+        </select>
+        <p class="lang-select-note">相手の言語が分かっているときは固定すると確実です。変更は次に「会話をはじめる」を押したときから反映されます。</p>
+      </div>
+
       <div class="transcript-box speaker-box">
         <div class="transcript-header">
           <div class="transcript-title-group">
@@ -643,6 +686,26 @@
       // 訂正後のシステム指示（そのまま使用）
       const SYSTEM_INSTRUCTION_TEXT =
         "あなたは岡山県玉野市の港で、地元の人と海外からの旅行者の会話を助ける通訳です。話しかけられた言語を自動で判別してください。旅行者の言葉は日本語で地元の人に伝え、地元の人の日本語は旅行者の言語に言い換えて伝えてください。直訳で終わらせず、相手が知りたいことに合わせて短く言い換えてください。地元の案内（直島への行き方、港の見どころ）が話題になったら、短い補足を足してよいです。返事は短く、会話の間を大切にしてください";
+
+      // 相手言語の固定設定（自動判別のままでは地元側が先に日本語で話すと返す言語が決まらないため、固定も選べるようにする）
+      const LANG_STORAGE_KEY = "minato_interpreter_target_lang_v1";
+      let selectedTargetLang = "auto";
+      try {
+        selectedTargetLang = localStorage.getItem(LANG_STORAGE_KEY) || "auto";
+      } catch (_) {}
+
+      function buildSystemInstruction() {
+        if (selectedTargetLang && selectedTargetLang !== "auto") {
+          return (
+            SYSTEM_INSTRUCTION_TEXT +
+            ` なお、旅行者の言語は${selectedTargetLang}に固定されています。自動判別に頼らず、地元の人の日本語は必ず${selectedTargetLang}で返し、${selectedTargetLang}で話された言葉は日本語で伝えてください。日本語で話しかけられたら、それは地元の人の発言です。決して日本語のまま返さず、必ず${selectedTargetLang}に通訳して返してください。`
+          );
+        }
+        return (
+          SYSTEM_INSTRUCTION_TEXT +
+          " なお、地元の人が先に日本語で話しかけた場合は、旅行者の言語がまだ分からなくても、まず英語で返してください。旅行者が別の言語で話したら、その言語に切り替えてください。日本語で話しかけられたときに日本語のまま返すことはしないでください。"
+        );
+      }
 
       const STORAGE_KEY = "minato_interpreter_gemini_api_key_v1";
       const WS_ENDPOINT =
@@ -702,6 +765,28 @@
       const speakerLangBadge = document.getElementById("speakerLangBadge");
       const replyLangBadge = document.getElementById("replyLangBadge");
       const travelerLangMemory = document.getElementById("travelerLangMemory");
+      const targetLangSelect = document.getElementById("targetLangSelect");
+
+      function refreshTargetLangUI() {
+        if (targetLangSelect) targetLangSelect.value = selectedTargetLang;
+        if (selectedTargetLang && selectedTargetLang !== "auto") {
+          travelerLangMemory.textContent = `${selectedTargetLang} ⇔ 日本語（固定）`;
+        }
+      }
+      if (targetLangSelect) {
+        refreshTargetLangUI();
+        targetLangSelect.addEventListener("change", () => {
+          selectedTargetLang = targetLangSelect.value || "auto";
+          try {
+            localStorage.setItem(LANG_STORAGE_KEY, selectedTargetLang);
+          } catch (_) {}
+          if (selectedTargetLang === "auto") {
+            travelerLangMemory.textContent =
+              "自動判別待機中（英語・中国語・韓国語・仏語ほか）";
+          }
+          refreshTargetLangUI();
+        });
+      }
 
       // State
       let isConversationActive = false;
@@ -935,7 +1020,7 @@
               }
             },
             systemInstruction: {
-              parts: [{ text: SYSTEM_INSTRUCTION_TEXT }]
+              parts: [{ text: buildSystemInstruction() }]
             },
             inputAudioTranscription: {},
             outputAudioTranscription: {}
