@@ -1298,7 +1298,7 @@
       }
 
       function updateButtonUI(active, connecting = false) {
-        talkButton.disabled = connecting;
+        // ボタンは無効化しない。接続中でもタップで中止できるようにする（無効化するとタップが無反応に見える）
         if (connecting) {
           talkButton.classList.remove("active");
           talkBtnWrapper.classList.remove("is-talking");
@@ -1482,6 +1482,7 @@
 
         const wsUrl = `${WS_ENDPOINT}?key=${encodeURIComponent(key)}`;
         let setupDone = false;
+        let setupTimer = null;
 
         try {
           activeWs = new WebSocket(wsUrl);
@@ -1490,6 +1491,13 @@
           setStatus("error", "WebSocket接続エラー", err.message || String(err));
           return;
         }
+
+        // 接続が固まったままにならないよう、20秒で見切って次のモデルへ進む（onclose側のフォールバックが働く）
+        setupTimer = setTimeout(() => {
+          if (!setupDone && activeWs) {
+            try { activeWs.close(); } catch (_) {}
+          }
+        }, 20000);
 
         activeWs.onopen = () => {
           if (!activeWs) return;
@@ -1504,6 +1512,7 @@
             // 1. Setup Completed -> Ready to stream audio
             if (msg.setupComplete !== undefined) {
               setupDone = true;
+              if (setupTimer) { clearTimeout(setupTimer); setupTimer = null; }
               verifiedModelIndex = modelIdx;
               isConnecting = false;
               isConversationActive = true;
@@ -1607,6 +1616,7 @@
         };
 
         activeWs.onclose = (event) => {
+          if (setupTimer) { clearTimeout(setupTimer); setupTimer = null; }
           const reasonLower = (event.reason || "").toLowerCase();
           const isAuthFail = /api_key_invalid|api key not valid|invalid api key|permission_denied/.test(reasonLower);
 
