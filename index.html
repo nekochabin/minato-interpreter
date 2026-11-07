@@ -792,6 +792,7 @@
       let isConversationActive = false;
       let isConnecting = false;
       let activeWs = null;
+      let allSockets = new Set();
       let probeWs = null;
       let probeTimer = null;
       let verifiedModelIndex = 0;
@@ -1376,6 +1377,7 @@
       function stopConversation(preserveErrorBanner = false) {
         isConversationActive = false;
         isConnecting = false;
+        updateButtonUI(false, false);
         speakerState.textContent = "";
         replyState.textContent = "";
 
@@ -1407,10 +1409,13 @@
           outputAudioCtx = null;
         }
 
-        if (activeWs) {
-          const wsToClose = activeWs;
-          activeWs = null;
+        const socketsToClose = new Set(allSockets);
+        if (activeWs) socketsToClose.add(activeWs);
+        activeWs = null;
+        allSockets.clear();
+        for (const wsToClose of socketsToClose) {
           try {
+            wsToClose.onopen = null;
             wsToClose.onclose = null;
             wsToClose.onerror = null;
             wsToClose.onmessage = null;
@@ -1430,6 +1435,7 @@
       }
 
       async function startConversation(modelIdx = verifiedModelIndex) {
+        if (isConnecting || isConversationActive) return;
         const key = (apiKeyInput.value || "").trim();
         const check = validateKeyFormat(key);
         if (!check.valid) {
@@ -1499,12 +1505,16 @@
           }
         }, 20000);
 
+        const myWs = activeWs;
+        allSockets.add(myWs);
+
         activeWs.onopen = () => {
           if (!activeWs) return;
           activeWs.send(JSON.stringify(buildSetupMessage(modelName)));
         };
 
         activeWs.onmessage = async (event) => {
+          if (myWs !== activeWs) return;
           try {
             const raw = event.data instanceof Blob ? await event.data.text() : event.data;
             const msg = JSON.parse(raw);
@@ -1617,6 +1627,8 @@
 
         activeWs.onclose = (event) => {
           if (setupTimer) { clearTimeout(setupTimer); setupTimer = null; }
+          allSockets.delete(myWs);
+          if (myWs !== activeWs) return;
           const reasonLower = (event.reason || "").toLowerCase();
           const isAuthFail = /api_key_invalid|api key not valid|invalid api key|permission_denied/.test(reasonLower);
 
