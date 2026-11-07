@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>港の通訳さん｜玉野・宇野港 多言語音声通訳</title>
+  <meta name="description" content="岡山県玉野市の港で、地元の人と海外からの旅行者の会話を助ける試作Webアプリ。Gemini Live APIで多言語を自動判別し、音声のまま通訳します。" />
+  <style>
+    :root {
+      --bg-sea-light: #f4f7f9;
+      --bg-card: #ffffff;
+      --bg-subtle: #edf2f6;
+      --text-main: #102536;
+      --text-muted: #4b657a;
+      --border-soft: #d5e1ea;
+      --sea-primary: #0d5c8c;
+      --sea-primary-hover: #09476d;
+      --sea-accent: #1478a6;
+      --active-coral: #d94336;
+      --active-coral-hover: #b83227;
+      --ok-green: #157347;
+      --ok-bg: #e8f6ee;
+      --ok-border: #a8dec0;
+      --warn-amber: #995c00;
+      --warn-bg: #fff6e5;
+      --warn-border: #f5d491;
+      --err-red: #b42318;
+      --err-bg: #fef0ef;
+      --err-border: #f7b9b5;
+      --shadow-card: 0 6px 20px rgba(16, 37, 54, 0.07);
+      --shadow-btn: 0 10px 28px rgba(13, 92, 140, 0.28);
+      --shadow-btn-active: 0 10px 30px rgba(217, 67, 54, 0.34);
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-sea-light);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+      line-height: 1.55;
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app-shell {
+      width: 100%;
+      max-width: 480px;
+      padding: 16px 16px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Header */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 4px 2px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      background: var(--sea-primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: var(--text-main);
+    }
+
+    .brand-subtitle {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .lang-badge {
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      color: var(--sea-primary);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* 3-Line Usage Card */
+    .guide-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .guide-heading {
+      margin: 0 0 6px 0;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--sea-primary);
+      letter-spacing: 0.03em;
+    }
+
+    .guide-lines {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 0.84rem;
+      color: var(--text-main);
+    }
+
+    .guide-lines li {
+      margin-bottom: 3px;
+    }
+
+    .guide-lines li:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Status & Error Banner */
+    .status-banner {
+      border-radius: var(--radius-md);
+      padding: 11px 14px;
+      font-size: 0.86rem;
+      border: 1px solid var(--border-soft);
+      background: var(--bg-card);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .status-banner.status-idle {
+      background: var(--bg-card);
+      border-color: var(--border-soft);
+      color: var(--text-muted);
+    }
+
+    .status-banner.status-checking {
+      background: var(--warn-bg);
+      border-color: var(--warn-border);
+      color: var(--warn-amber);
+    }
+
+    .status-banner.status-ok {
+      background: var(--ok-bg);
+      border-color: var(--ok-border);
+      color: var(--ok-green);
+    }
+
+    .status-banner.status-error {
+      background: var(--err-bg);
+      border-color: var(--err-border);
+      color: var(--err-red);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-top: 6px;
+      flex-shrink: 0;
+      background: #94a3b8;
+    }
+
+    .status-checking .status-dot {
+      background: #d97706;
+      animation: pulseDot 1.2s infinite ease-in-out;
+    }
+
+    .status-ok .status-dot {
+      background: #16a34a;
+    }
+
+    .status-error .status-dot {
+      background: #dc2626;
+    }
+
+    .status-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .status-title {
+      font-weight: 700;
+      display: block;
+    }
+
+    .status-reason {
+      font-size: 0.81rem;
+      margin-top: 2px;
+      display: block;
+      word-break: break-word;
+    }
+
+    /* Main Action Area (Big Single Button) */
+    .talk-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 0 4px;
+    }
+
+    .talk-btn-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .wave-ring {
+      position: absolute;
+      width: 184px;
+      height: 184px;
+      border-radius: 50%;
+      border: 2px solid rgba(217, 67, 54, 0.35);
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.95);
+    }
+
+    .is-talking .wave-ring-1 {
+      animation: rippleWave 2s infinite ease-out;
+    }
+
+    .is-talking .wave-ring-2 {
+      animation: rippleWave 2s infinite 0.7s ease-out;
+    }
+
+    .talk-button {
+      position: relative;
+      z-index: 2;
+      width: 176px;
+      height: 176px;
+      border-radius: 50%;
+      border: none;
+      background: var(--sea-primary);
+      color: #ffffff;
+      box-shadow: var(--shadow-btn);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 16px;
+      transition: transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+      user-select: none;
+    }
+
+    .talk-button:hover {
+      background: var(--sea-primary-hover);
+    }
+
+    .talk-button:active {
+      transform: scale(0.96);
+    }
+
+    .talk-button.active {
+      background: var(--active-coral);
+      box-shadow: var(--shadow-btn-active);
+    }
+
+    .talk-button.active:hover {
+      background: var(--active-coral-hover);
+    }
+
+    .talk-button:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .talk-btn-icon {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .talk-btn-label {
+      font-size: 1.12rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-align: center;
+      line-height: 1.25;
+    }
+
+    .talk-btn-sub {
+      font-size: 0.76rem;
+      opacity: 0.9;
+      font-weight: 500;
+    }
+
+    /* Active Language Pair Bar */
+    .lang-pair-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .lang-pair-bar strong {
+      color: var(--sea-primary);
+      font-weight: 700;
+    }
+
+    /* Live Transcripts Area */
+    .transcript-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .transcript-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      padding: 13px 15px;
+      box-shadow: var(--shadow-card);
+      min-height: 94px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .transcript-box.reply-box {
+      border-left: 4px solid var(--sea-primary);
+    }
+
+    .transcript-box.speaker-box {
+      border-left: 4px solid #64748b;
+    }
+
+    .transcript-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .transcript-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .transcript-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .detected-lang-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      border: 1px solid var(--border-soft);
+    }
+
+    .detected-lang-pill.active-lang {
+      background: #e3f1fa;
+      color: var(--sea-primary);
+      border-color: #b6d8ee;
+    }
+
+    .transcript-state {
+      font-size: 0.75rem;
+      color: var(--sea-accent);
+      font-weight: 600;
+    }
+
+    .transcript-text {
+      margin: 0;
+      font-size: 1.02rem;
+      font-weight: 600;
+      color: var(--text-main);
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .transcript-text.placeholder {
+      font-weight: 400;
+      font-size: 0.9rem;
+      color: #8da2b5;
+    }
+
+    /* API Key Settings Panel */
+    .settings-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .settings-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .settings-label {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .settings-Badge {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: var(--bg-subtle);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .key-input-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .key-input {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 12px;
+      font-size: 0.92rem;
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .key-input:focus {
+      border-color: var(--sea-primary);
+      background: #fff;
+    }
+
+    .btn-secondary {
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border-radius: 10px;
+      border: 1px solid var(--border-soft);
+      background: #fff;
+      color: var(--text-main);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-secondary:active {
+      background: var(--bg-subtle);
+    }
+
+    .settings-note {
+      margin: 7px 0 0 0;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(0.85); }
+    }
+
+    @keyframes rippleWave {
+      0% {
+        transform: scale(0.95);
+        opacity: 0.75;
+      }
+      100% {
+        transform: scale(1.38);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-group">
+        <div class="brand-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4"/>
+            <circle cx="12" cy="8" r="2"/>
+            <path d="M12 10v12"/>
+            <path d="M5 15H2a10 10 0 0 0 20 0h-3"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">港の通訳さん</h1>
+          <p class="brand-subtitle">岡山県玉野市・宇野港 多言語音声通訳（試作品）</p>
+        </div>
+      </div>
+      <span class="lang-badge">日本語 ⇔ 多言語自動判別</span>
+    </header>
+
+    <!-- 3-Line Usage Guide -->
+    <section class="guide-card" aria-label="使い方">
+      <h2 class="guide-heading">使い方（3行ガイド）</h2>
+      <ol class="guide-lines">
+        <li>下の設定欄に <strong>Gemini APIキー</strong> を貼ると、自動で接続を確認しこの端末内にだけ保存します。</li>
+        <li>中央の大きな <strong>「会話をはじめる」</strong> を押し、旅行者の言葉（何語でも可）または日本語で話しかけます。</li>
+        <li>言語を自動判別して音声と文字で通訳します（もう一度ボタンを押すと会話が終わります）。</li>
+      </ol>
+    </section>
+
+    <!-- Connection Status / Reason Display -->
+    <section id="statusBanner" class="status-banner status-idle" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
+      <div class="status-content">
+        <span id="statusTitle" class="status-title">APIキーを設定してください</span>
+        <span id="statusReason" class="status-reason">下の設定欄にGemini APIキーを貼り付けると、すぐに接続テストを行います。</span>
+      </div>
+    </section>
+
+    <!-- Single Large Conversation Button -->
+    <section class="talk-section" aria-label="音声会話コントロール">
+      <div id="talkBtnWrapper" class="talk-btn-wrapper">
+        <div class="wave-ring wave-ring-1"></div>
+        <div class="wave-ring wave-ring-2"></div>
+        <button id="talkButton" type="button" class="talk-button" aria-pressed="false">
+          <span class="talk-btn-icon" id="talkBtnIcon" aria-hidden="true">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" x2="12" y1="19" y2="22"/>
+            </svg>
+          </span>
+          <span id="talkBtnLabel" class="talk-btn-label">会話をはじめる</span>
+          <span id="talkBtnSub" class="talk-btn-sub">タップで開始 / Start</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Live Text Display (Speaker & Interpreter) with Detected Language Indicator -->
+    <section class="transcript-section" aria-label="会話の文字表示">
+      <div class="lang-pair-bar" aria-live="polite">
+        <span>旅行者の言語：<strong id="travelerLangMemory">自動判別待機中（英語・中国語・韓国語・仏語ほか）</strong></span>
+      </div>
+
+      <div class="transcript-box speaker-box">
+        <div class="transcript-header">
+          <div class="transcript-title-group">
+            <span class="transcript-label">相手の言葉（聞き取り）</span>
+            <span id="speakerLangBadge" class="detected-lang-pill">判別言語：待機中</span>
+          </div>
+          <span id="speakerState" class="transcript-state"></span>
+        </div>
+        <p id="speakerText" class="transcript-text placeholder">ここに話しかけた言葉が表示されます</p>
+      </div>
+
+      <div class="transcript-box reply-box">
+        <div class="transcript-header">
+          <div class="transcript-title-group">
+            <span class="transcript-label">通訳の返事（自分の返事）</span>
+            <span id="replyLangBadge" class="detected-lang-pill">返答言語：待機中</span>
+          </div>
+          <span id="replyState" class="transcript-state"></span>
+        </div>
+        <p id="replyText" class="transcript-text placeholder">旅行者の言葉は日本語に、地元の人の日本語は直前の旅行者の言語に通訳して表示します</p>
+      </div>
+    </section>
+
+    <!-- Settings: API Key Input -->
+    <section class="settings-card" aria-label="APIキー設定">
+      <div class="settings-label-row">
+        <label for="apiKeyInput" class="settings-label">設定：Gemini APIキー</label>
+        <span class="settings-Badge">端末内ブラウザのみ保存</span>
+      </div>
+      <div class="key-input-group">
+        <input
+          id="apiKeyInput"
+          type="password"
+          class="key-input"
+          placeholder="AIzaSy... から始まるキーを貼り付け"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="toggleKeyVisBtn" type="button" class="btn-secondary" title="表示切替">表示</button>
+        <button id="clearKeyBtn" type="button" class="btn-secondary" title="キーを消去">消去</button>
+      </div>
+      <p class="settings-note">
+        ※キーはコードや外部ファイルに書き込まれず、このブラウザの <code>localStorage</code> にのみ保存されます。貼り付けると自動で接続を試みます。
+      </p>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      // 訂正後のシステム指示（そのまま使用）
+      const SYSTEM_INSTRUCTION_TEXT =
+        "あなたは岡山県玉野市の港で、地元の人と海外からの旅行者の会話を助ける通訳です。話しかけられた言語を自動で判別してください。旅行者の言葉は日本語で地元の人に伝え、地元の人の日本語は旅行者の言語に言い換えて伝えてください。直訳で終わらせず、相手が知りたいことに合わせて短く言い換えてください。地元の案内（直島への行き方、港の見どころ）が話題になったら、短い補足を足してよいです。返事は短く、会話の間を大切にしてください";
+
+      const STORAGE_KEY = "minato_interpreter_gemini_api_key_v1";
+      const WS_ENDPOINT =
+        "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
+
+      // Gemini Live API 対応モデルの優先順リスト
+      const LIVE_MODELS = [
+        "models/gemini-2.5-flash-native-audio-latest",
+        "models/gemini-2.5-flash-native-audio-preview-12-2025",
+        "models/gemini-2.0-flash-live-001",
+        "models/gemini-2.0-flash-exp"
+      ];
+
+      // BCP-47 言語コードから表示名へのマップ
+      const BCP47_NAMES = {
+        ja: "日本語",
+        en: "英語 (English)",
+        zh: "中国語 (中文)",
+        cmn: "中国語 (中文)",
+        yue: "広東語 (粵語)",
+        ko: "韓国語 (한국어)",
+        fr: "フランス語 (Français)",
+        es: "スペイン語 (Español)",
+        de: "ドイツ語 (Deutsch)",
+        it: "イタリア語 (Italiano)",
+        pt: "ポルトガル語 (Português)",
+        ru: "ロシア語 (Русский)",
+        th: "タイ語 (ไทย)",
+        vi: "ベトナム語 (Tiếng Việt)",
+        id: "インドネシア語 (Bahasa Indonesia)",
+        ms: "マレー語 (Bahasa Melayu)",
+        ar: "アラビア語 (العربية)",
+        hi: "ヒンディー語 (हिन्दी)",
+        nl: "オランダ語 (Nederlands)",
+        pl: "ポーランド語 (Polski)",
+        tr: "トルコ語 (Türkçe)",
+        tl: "タガログ語 (Tagalog)",
+        fil: "フィリピン語 (Filipino)"
+      };
+
+      // DOM Elements
+      const apiKeyInput = document.getElementById("apiKeyInput");
+      const toggleKeyVisBtn = document.getElementById("toggleKeyVisBtn");
+      const clearKeyBtn = document.getElementById("clearKeyBtn");
+      const statusBanner = document.getElementById("statusBanner");
+      const statusTitle = document.getElementById("statusTitle");
+      const statusReason = document.getElementById("statusReason");
+      const talkBtnWrapper = document.getElementById("talkBtnWrapper");
+      const talkButton = document.getElementById("talkButton");
+      const talkBtnIcon = document.getElementById("talkBtnIcon");
+      const talkBtnLabel = document.getElementById("talkBtnLabel");
+      const talkBtnSub = document.getElementById("talkBtnSub");
+      const speakerText = document.getElementById("speakerText");
+      const replyText = document.getElementById("replyText");
+      const speakerState = document.getElementById("speakerState");
+      const replyState = document.getElementById("replyState");
+      const speakerLangBadge = document.getElementById("speakerLangBadge");
+      const replyLangBadge = document.getElementById("replyLangBadge");
+      const travelerLangMemory = document.getElementById("travelerLangMemory");
+
+      // State
+      let isConversationActive = false;
+      let isConnecting = false;
+      let activeWs = null;
+      let probeWs = null;
+      let probeTimer = null;
+      let verifiedModelIndex = 0;
+      let lastTravelerLangLabel = null;
+
+      // Audio I/O State
+      let micStream = null;
+      let inputAudioCtx = null;
+      let micSourceNode = null;
+      let processorNode = null;
+      let outputAudioCtx = null;
+      let nextPlayTime = 0;
+      let scheduledSources = [];
+
+      // Transcript Accumulation per Turn
+      let currentInputTranscript = "";
+      let currentOutputTranscript = "";
+      let currentInputLangCode = "";
+      let currentOutputLangCode = "";
+      let turnResetPending = false;
+
+      const MIC_SVG = `
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" x2="12" y1="19" y2="22"/>
+        </svg>`;
+
+      const STOP_SVG = `
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="6" width="12" height="12" rx="2.5"/>
+        </svg>`;
+
+      /**
+       * APIの languageCode（BCP-47）と文字スクリプト・語彙から言語を判別して日本語表示名を返す
+       */
+      function detectLanguageLabel(text, apiLangCode) {
+        // 1. まずAPIから返されたBCP-47言語コードがあれば優先利用
+        if (apiLangCode && typeof apiLangCode === "string") {
+          const cleanCode = apiLangCode.trim().toLowerCase();
+          if (cleanCode && cleanCode !== "und" && cleanCode !== "unknown") {
+            const primarySubtag = cleanCode.split(/[-_]/)[0];
+            if (cleanCode.includes("hant") || cleanCode.includes("tw") || cleanCode.includes("hk")) {
+              return { code: "zh-Hant", label: "中国語・繁体字 (繁體中文)", isJapanese: false };
+            }
+            if (cleanCode.includes("hans") || cleanCode.includes("cn")) {
+              return { code: "zh-Hans", label: "中国語・簡体字 (简体中文)", isJapanese: false };
+            }
+            if (BCP47_NAMES[primarySubtag]) {
+              return {
+                code: primarySubtag,
+                label: BCP47_NAMES[primarySubtag],
+                isJapanese: primarySubtag === "ja"
+              };
+            }
+          }
+        }
+
+        const sample = (text || "").trim();
+        if (!sample) return null;
+
+        // 2. 文字種（スクリプト）による自動判別
+        // ひらがな・カタカナが含まれていれば日本語
+        if (/[\u3040-\u309F\u30A0-\u30FF]/.test(sample)) {
+          return { code: "ja", label: "日本語", isJapanese: true };
+        }
+        // ハングルが含まれていれば韓国語
+        if (/[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/.test(sample)) {
+          return { code: "ko", label: "韓国語 (한국어)", isJapanese: false };
+        }
+        // 漢字のみ（かな無し）の場合は中国語と日本語（漢字のみの短文）を語彙・文字で識別
+        if (/[\u4E00-\u9FFF]/.test(sample)) {
+          const zhMarkers = /[的了嗎吗呢吧我你他她它們们這这那哪裡里去到在有是要想請問请问謝谢對不起对不起號号船票島岛港幾几點点錢钱]/.test(sample);
+          if (zhMarkers) {
+            return { code: "zh", label: "中国語 (中文)", isJapanese: false };
+          }
+          return { code: "zh", label: "中国語 (中文)", isJapanese: false };
+        }
+        // タイ文字
+        if (/[\u0E00-\u0E7F]/.test(sample)) {
+          return { code: "th", label: "タイ語 (ไทย)", isJapanese: false };
+        }
+        // キリル文字
+        if (/[\u0400-\u04FF]/.test(sample)) {
+          return { code: "ru", label: "ロシア語 (Русский)", isJapanese: false };
+        }
+        // アラビア文字
+        if (/[\u0600-\u06FF]/.test(sample)) {
+          return { code: "ar", label: "アラビア語 (العربية)", isJapanese: false };
+        }
+        // デーヴァナーガリー文字
+        if (/[\u0900-\u097F]/.test(sample)) {
+          return { code: "hi", label: "ヒンディー語 (हिन्दी)", isJapanese: false };
+        }
+
+        // 3. ラテン文字圏の言語判別（ベトナム語・フランス語・スペイン語・ドイツ語・イタリア語・ポルトガル語・英語）
+        const lower = sample.toLowerCase();
+
+        // ベトナム語特有の声調付き文字
+        if (/[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(sample)) {
+          return { code: "vi", label: "ベトナム語 (Tiếng Việt)", isJapanese: false };
+        }
+        // フランス語
+        if (
+          /[œç]|(\b(bonjour|bonsoir|merci|s'il|vous|plaît|où|comment|aller|pour|billet|bateau|ferry|port|je|suis|nous|est-ce|qu'il|combien|heure|départ)\b)/i.test(
+            lower
+          )
+        ) {
+          return { code: "fr", label: "フランス語 (Français)", isJapanese: false };
+        }
+        // スペイン語
+        if (
+          /[¿¡ñ]|(\b(hola|gracias|por favor|dónde|cómo|cuánto|cuándo|barco|boleto|puerto|para|está|están|buenos días|buenas)\b)/i.test(
+            lower
+          )
+        ) {
+          return { code: "es", label: "スペイン語 (Español)", isJapanese: false };
+        }
+        // ドイツ語
+        if (
+          /[ß]|(\b(guten|danke|bitte|wie|wo|wann|fähre|hafen|nach|ticket|fahrkarte|ich|sie|wir|ist|sind)\b)/i.test(
+            lower
+          )
+        ) {
+          return { code: "de", label: "ドイツ語 (Deutsch)", isJapanese: false };
+        }
+        // イタリア語
+        if (
+          /\b(ciao|buongiorno|grazie|per favore|dov'è|dove|come|quanto|traghetto|biglietto|porto|sono|siamo)\b/i.test(
+            lower
+          )
+        ) {
+          return { code: "it", label: "イタリア語 (Italiano)", isJapanese: false };
+        }
+        // ポルトガル語
+        if (
+          /[ãõ]|(\b(olá|obrigado|obrigada|onde|como|quanto|barco|porto|bilhete|bom dia)\b)/i.test(
+            lower
+          )
+        ) {
+          return { code: "pt", label: "ポルトガル語 (Português)", isJapanese: false };
+        }
+        // インドネシア語・マレー語
+        if (
+          /\b(terima kasih|tolong|di mana|bagaimana|kapal|pelabuhan|tiket|selamat)\b/i.test(lower)
+        ) {
+          return { code: "id", label: "インドネシア語 (Bahasa Indonesia)", isJapanese: false };
+        }
+        // ラテン文字が含まれていれば英語（または欧米言語）
+        if (/[a-zA-Z]/.test(sample)) {
+          return { code: "en", label: "英語 (English)", isJapanese: false };
+        }
+
+        return null;
+      }
+
+      // UI Status Helper
+      function setStatus(type, title, reason) {
+        statusBanner.className = `status-banner status-${type}`;
+        statusTitle.textContent = title;
+        statusReason.textContent = reason || "";
+      }
+
+      // Close codes & error translator to clear Japanese explanation
+      function explainCloseOrError(code, rawReason) {
+        const reasonStr = (rawReason || "").trim();
+        if (!navigator.onLine) {
+          return "インターネットに接続されていません。電波状況を確認してください。";
+        }
+        if (reasonStr) {
+          if (/API_KEY_INVALID|API key not valid|invalid api key/i.test(reasonStr)) {
+            return `APIキーが無効です。正しいGemini APIキーか確認してください（詳細: ${reasonStr}）`;
+          }
+          if (/permission|unregistered|403|unauthorized/i.test(reasonStr)) {
+            return `APIキーの権限エラー、またはLive APIが有効ではありません（詳細: ${reasonStr}）`;
+          }
+          if (/quota|429|rate limit/i.test(reasonStr)) {
+            return `APIの利用上限（クォータ）に達しています。しばらく待ってから試してください（詳細: ${reasonStr}）`;
+          }
+          if (/not found|not supported|model/i.test(reasonStr)) {
+            return `指定した音声モデルにこのキーでアクセスできませんでした（詳細: ${reasonStr}）`;
+          }
+          return `サーバーから切断されました（コード: ${code || "不明"} / 理由: ${reasonStr}）`;
+        }
+        switch (code) {
+          case 1000:
+            return "正常に切断されました。";
+          case 1006:
+            return "Gemini Live APIへの接続が途中で遮断されました（コード1006）。APIキーの誤り、またはネットワーク制限の可能性があります。";
+          case 1007:
+            return "送信データまたはAPIキー形式が不正なため拒否されました（コード1007）。";
+          case 1008:
+            return "APIキーが無効、または対象モデルへのアクセス権限がありません（コード1008 Policy Violation）。";
+          case 1011:
+            return "Geminiサーバー側で一時的な内部エラーが発生しました（コード1011）。もう一度お試しください。";
+          default:
+            return `Gemini Live APIに接続できませんでした（コード: ${code || "応答なし"}）。APIキーと通信環境を確認してください。`;
+        }
+      }
+
+      function validateKeyFormat(key) {
+        if (!key) {
+          return { valid: false, reason: "APIキーが空です。設定欄にGemini APIキーを貼り付けてください。" };
+        }
+        if (/\s/.test(key)) {
+          return { valid: false, reason: "APIキーに空白や改行が含まれています。余分な文字を取り除いてください。" };
+        }
+        if (key.length < 20) {
+          return { valid: false, reason: "APIキーの文字数が短すぎます（通常はAIza...から始まる39文字程度です）。" };
+        }
+        return { valid: true };
+      }
+
+      function buildSetupMessage(modelName) {
+        return {
+          setup: {
+            model: modelName,
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: "Aoede"
+                  }
+                }
+              }
+            },
+            systemInstruction: {
+              parts: [{ text: SYSTEM_INSTRUCTION_TEXT }]
+            },
+            inputAudioTranscription: {},
+            outputAudioTranscription: {}
+          }
+        };
+      }
+
+      // 完了条件：「設定欄にキーを貼ると接続を試みる状態になっていること。接続できない場合は理由が画面に出ること。」
+      function testConnectionWithKey(rawKey, modelIdx = 0) {
+        if (probeWs) {
+          try { probeWs.close(); } catch (_) {}
+          probeWs = null;
+        }
+        if (probeTimer) {
+          clearTimeout(probeTimer);
+          probeTimer = null;
+        }
+
+        const key = (rawKey || "").trim();
+        if (!key) {
+          setStatus(
+            "idle",
+            "APIキーを設定してください",
+            "下の設定欄にGemini APIキーを貼り付けると、すぐに接続テストを行います。"
+          );
+          return;
+        }
+
+        const check = validateKeyFormat(key);
+        if (!check.valid) {
+          setStatus("error", "接続できません（APIキーの形式エラー）", check.reason);
+          return;
+        }
+
+        const modelName = LIVE_MODELS[modelIdx] || LIVE_MODELS[0];
+        setStatus(
+          "checking",
+          "Gemini Live API へ接続を試みています…",
+          `モデル (${modelName.replace("models/", "")}) とハンドシェイク中…`
+        );
+
+        let settled = false;
+        const wsUrl = `${WS_ENDPOINT}?key=${encodeURIComponent(key)}`;
+
+        try {
+          probeWs = new WebSocket(wsUrl);
+        } catch (err) {
+          setStatus(
+            "error",
+            "接続を開始できませんでした",
+            `WebSocketの作成に失敗しました: ${err.message || String(err)}`
+          );
+          return;
+        }
+
+        probeTimer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          try { probeWs.close(); } catch (_) {}
+          setStatus(
+            "error",
+            "接続タイムアウト（応答がありません）",
+            "10秒以内にGemini Live APIから応答がありませんでした。ネットワーク環境またはプロキシ制限を確認してください。"
+          );
+        }, 10000);
+
+        probeWs.onopen = () => {
+          if (settled) return;
+          try {
+            probeWs.send(JSON.stringify(buildSetupMessage(modelName)));
+          } catch (err) {
+            settled = true;
+            clearTimeout(probeTimer);
+            setStatus("error", "初期設定の送信に失敗しました", err.message || String(err));
+          }
+        };
+
+        probeWs.onmessage = async (event) => {
+          if (settled) return;
+          try {
+            const text = event.data instanceof Blob ? await event.data.text() : event.data;
+            const data = JSON.parse(text);
+            if (data.setupComplete !== undefined) {
+              settled = true;
+              clearTimeout(probeTimer);
+              verifiedModelIndex = modelIdx;
+              setStatus(
+                "ok",
+                "Gemini Live API 接続確認OK",
+                "準備完了です。中央の「会話をはじめる」ボタンを押すと多言語音声通訳が始まります。"
+              );
+              try { probeWs.close(1000, "Probe complete"); } catch (_) {}
+              probeWs = null;
+            } else if (data.error) {
+              settled = true;
+              clearTimeout(probeTimer);
+              setStatus(
+                "error",
+                "Gemini Live API エラー",
+                data.error.message || JSON.stringify(data.error)
+              );
+              try { probeWs.close(); } catch (_) {}
+            }
+          } catch (err) {
+            // ignore non-JSON frame if any
+          }
+        };
+
+        probeWs.onerror = () => {
+          // Detailed reason comes in onclose
+        };
+
+        probeWs.onclose = (event) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(probeTimer);
+
+          const reasonText = (event.reason || "").toLowerCase();
+          const isAuthFail = /api_key_invalid|api key not valid|invalid api key|permission_denied/.test(reasonText);
+          if (!isAuthFail && modelIdx + 1 < LIVE_MODELS.length) {
+            testConnectionWithKey(key, modelIdx + 1);
+            return;
+          }
+
+          setStatus(
+            "error",
+            "Gemini Live API に接続できませんでした",
+            explainCloseOrError(event.code, event.reason)
+          );
+        };
+      }
+
+      // Utility: ArrayBuffer -> Base64
+      function arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary);
+      }
+
+      // Utility: Base64 -> Int16Array (PCM16 LE)
+      function base64ToInt16Array(base64) {
+        const binary = atob(base64);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return new Int16Array(bytes.buffer);
+      }
+
+      // Downsample Float32 audio buffer to 16000Hz Int16 PCM
+      function floatTo16kHzPcm16(float32Data, inputSampleRate) {
+        if (inputSampleRate === 16000) {
+          const pcm16 = new Int16Array(float32Data.length);
+          for (let i = 0; i < float32Data.length; i++) {
+            const s = Math.max(-1, Math.min(1, float32Data[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+          }
+          return pcm16.buffer;
+        }
+        const ratio = inputSampleRate / 16000;
+        const newLength = Math.round(float32Data.length / ratio);
+        const pcm16 = new Int16Array(newLength);
+        let offsetResult = 0;
+        let offsetBuffer = 0;
+        while (offsetResult < pcm16.length) {
+          const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+          let accum = 0;
+          let count = 0;
+          for (let i = offsetBuffer; i < nextOffsetBuffer && i < float32Data.length; i++) {
+            accum += float32Data[i];
+            count++;
+          }
+          const sample = count > 0 ? accum / count : 0;
+          const clamped = Math.max(-1, Math.min(1, sample));
+          pcm16[offsetResult] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
+          offsetResult++;
+          offsetBuffer = nextOffsetBuffer;
+        }
+        return pcm16.buffer;
+      }
+
+      // Enqueue 24kHz PCM16 audio from Gemini Live API for gapless playback
+      function playPcm24kChunk(base64Data) {
+        if (!outputAudioCtx) return;
+        if (outputAudioCtx.state === "suspended") {
+          outputAudioCtx.resume().catch(() => {});
+        }
+
+        const int16 = base64ToInt16Array(base64Data);
+        if (int16.length === 0) return;
+
+        const float32 = new Float32Array(int16.length);
+        for (let i = 0; i < int16.length; i++) {
+          float32[i] = int16[i] / 32768.0;
+        }
+
+        const audioBuffer = outputAudioCtx.createBuffer(1, float32.length, 24000);
+        audioBuffer.getChannelData(0).set(float32);
+
+        const source = outputAudioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(outputAudioCtx.destination);
+
+        const now = outputAudioCtx.currentTime;
+        if (nextPlayTime < now) {
+          nextPlayTime = now + 0.02;
+        }
+
+        source.start(nextPlayTime);
+        nextPlayTime += audioBuffer.duration;
+        scheduledSources.push(source);
+
+        replyState.textContent = "音声読み上げ中…";
+        source.onended = () => {
+          scheduledSources = scheduledSources.filter((s) => s !== source);
+          if (scheduledSources.length === 0) {
+            replyState.textContent = "";
+          }
+        };
+      }
+
+      function clearPlaybackQueue() {
+        for (const src of scheduledSources) {
+          try { src.stop(); } catch (_) {}
+        }
+        scheduledSources = [];
+        if (outputAudioCtx) {
+          nextPlayTime = outputAudioCtx.currentTime;
+        }
+        replyState.textContent = "";
+      }
+
+      function updateSpeakerTranscriptUI(text, langCode, isInterim = false) {
+        if (!text) return;
+        speakerText.classList.remove("placeholder");
+        speakerText.textContent = text;
+        speakerState.textContent = isInterim ? "聞き取り中…" : "";
+
+        const detected = detectLanguageLabel(text, langCode);
+        if (detected) {
+          const roleNote = detected.isJapanese ? "地元の人" : "旅行者";
+          speakerLangBadge.textContent = `判別言語：${detected.label}（${roleNote}）`;
+          speakerLangBadge.classList.add("active-lang");
+
+          if (!detected.isJapanese) {
+            lastTravelerLangLabel = detected.label;
+            travelerLangMemory.textContent = `${detected.label} ⇔ 日本語`;
+          }
+        }
+      }
+
+      function updateReplyTranscriptUI(text, langCode) {
+        if (!text) return;
+        replyText.classList.remove("placeholder");
+        replyText.textContent = text;
+
+        const detected = detectLanguageLabel(text, langCode);
+        if (detected) {
+          replyLangBadge.textContent = `返答言語：${detected.label}`;
+          replyLangBadge.classList.add("active-lang");
+
+          if (!detected.isJapanese) {
+            lastTravelerLangLabel = detected.label;
+            travelerLangMemory.textContent = `${detected.label} ⇔ 日本語`;
+          }
+        } else if (lastTravelerLangLabel) {
+          replyLangBadge.textContent = `返答言語：${lastTravelerLangLabel}`;
+          replyLangBadge.classList.add("active-lang");
+        }
+      }
+
+      function updateButtonUI(active, connecting = false) {
+        talkButton.disabled = connecting;
+        if (connecting) {
+          talkButton.classList.remove("active");
+          talkBtnWrapper.classList.remove("is-talking");
+          talkButton.setAttribute("aria-pressed", "false");
+          talkBtnIcon.innerHTML = MIC_SVG;
+          talkBtnLabel.textContent = "接続中…";
+          talkBtnSub.textContent = "Connecting...";
+        } else if (active) {
+          talkButton.classList.add("active");
+          talkBtnWrapper.classList.add("is-talking");
+          talkButton.setAttribute("aria-pressed", "true");
+          talkBtnIcon.innerHTML = STOP_SVG;
+          talkBtnLabel.textContent = "会話をやめる";
+          talkBtnSub.textContent = "もう一度押すと終了 / Stop";
+        } else {
+          talkButton.classList.remove("active");
+          talkBtnWrapper.classList.remove("is-talking");
+          talkButton.setAttribute("aria-pressed", "false");
+          talkBtnIcon.innerHTML = MIC_SVG;
+          talkBtnLabel.textContent = "会話をはじめる";
+          talkBtnSub.textContent = "タップで開始 / Start";
+        }
+      }
+
+      async function startMicrophoneStreaming() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("このブラウザはマイク入力（getUserMedia）に対応していません。HTTPSまたは対応ブラウザで開いてください。");
+        }
+
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        inputAudioCtx = new AudioCtx();
+        if (inputAudioCtx.state === "suspended") {
+          await inputAudioCtx.resume();
+        }
+
+        micSourceNode = inputAudioCtx.createMediaStreamSource(micStream);
+        processorNode = inputAudioCtx.createScriptProcessor(2048, 1, 1);
+
+        processorNode.onaudioprocess = (event) => {
+          if (!isConversationActive || !activeWs || activeWs.readyState !== WebSocket.OPEN) {
+            return;
+          }
+          const inputData = event.inputBuffer.getChannelData(0);
+          const pcm16Buffer = floatTo16kHzPcm16(inputData, inputAudioCtx.sampleRate);
+          const base64Audio = arrayBufferToBase64(pcm16Buffer);
+
+          try {
+            activeWs.send(
+              JSON.stringify({
+                realtimeInput: {
+                  audio: {
+                    mimeType: "audio/pcm;rate=16000",
+                    data: base64Audio
+                  }
+                }
+              })
+            );
+          } catch (_) {}
+        };
+
+        micSourceNode.connect(processorNode);
+        processorNode.connect(inputAudioCtx.destination);
+      }
+
+      function stopConversation(preserveErrorBanner = false) {
+        isConversationActive = false;
+        isConnecting = false;
+        speakerState.textContent = "";
+        replyState.textContent = "";
+
+        if (processorNode) {
+          try {
+            processorNode.disconnect();
+            processorNode.onaudioprocess = null;
+          } catch (_) {}
+          processorNode = null;
+        }
+        if (micSourceNode) {
+          try { micSourceNode.disconnect(); } catch (_) {}
+          micSourceNode = null;
+        }
+        if (micStream) {
+          try {
+            micStream.getTracks().forEach((track) => track.stop());
+          } catch (_) {}
+          micStream = null;
+        }
+        if (inputAudioCtx) {
+          try { inputAudioCtx.close(); } catch (_) {}
+          inputAudioCtx = null;
+        }
+
+        clearPlaybackQueue();
+        if (outputAudioCtx) {
+          try { outputAudioCtx.close(); } catch (_) {}
+          outputAudioCtx = null;
+        }
+
+        if (activeWs) {
+          const wsToClose = activeWs;
+          activeWs = null;
+          try {
+            wsToClose.onclose = null;
+            wsToClose.onerror = null;
+            wsToClose.onmessage = null;
+            wsToClose.close(1000, "User stopped conversation");
+          } catch (_) {}
+        }
+
+        updateButtonUI(false, false);
+
+        if (!preserveErrorBanner) {
+          setStatus(
+            "ok",
+            "会話を終了しました",
+            "もう一度「会話をはじめる」を押すと、いつでも通訳を再開できます。"
+          );
+        }
+      }
+
+      async function startConversation(modelIdx = verifiedModelIndex) {
+        const key = (apiKeyInput.value || "").trim();
+        const check = validateKeyFormat(key);
+        if (!check.valid) {
+          setStatus("error", "会話を開始できません（APIキー未設定）", check.reason);
+          apiKeyInput.focus();
+          return;
+        }
+
+        // Stop any background probe first
+        if (probeWs) {
+          try { probeWs.close(); } catch (_) {}
+          probeWs = null;
+        }
+        if (probeTimer) {
+          clearTimeout(probeTimer);
+          probeTimer = null;
+        }
+
+        isConnecting = true;
+        updateButtonUI(false, true);
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        outputAudioCtx = new AudioCtx({ sampleRate: 24000 });
+        if (outputAudioCtx.state === "suspended") {
+          try { await outputAudioCtx.resume(); } catch (_) {}
+        }
+        nextPlayTime = 0;
+
+        // First request microphone permission so any permission error is immediately shown
+        try {
+          await startMicrophoneStreaming();
+        } catch (micErr) {
+          stopConversation(true);
+          let reason = micErr.message || String(micErr);
+          if (micErr.name === "NotAllowedError" || micErr.name === "PermissionDeniedError") {
+            reason = "マイクの使用が許可されませんでした。ブラウザのアドレスバーの設定からマイクへのアクセスを許可してください。";
+          } else if (micErr.name === "NotFoundError") {
+            reason = "マイクが見つかりませんでした。端末にマイクが接続されているか確認してください。";
+          }
+          setStatus("error", "マイクを起動できませんでした", reason);
+          return;
+        }
+
+        const modelName = LIVE_MODELS[modelIdx] || LIVE_MODELS[0];
+        setStatus(
+          "checking",
+          "Gemini Live API に接続しています…",
+          `音声ストリームを準備中 (${modelName.replace("models/", "")})…`
+        );
+
+        const wsUrl = `${WS_ENDPOINT}?key=${encodeURIComponent(key)}`;
+        let setupDone = false;
+
+        try {
+          activeWs = new WebSocket(wsUrl);
+        } catch (err) {
+          stopConversation(true);
+          setStatus("error", "WebSocket接続エラー", err.message || String(err));
+          return;
+        }
+
+        activeWs.onopen = () => {
+          if (!activeWs) return;
+          activeWs.send(JSON.stringify(buildSetupMessage(modelName)));
+        };
+
+        activeWs.onmessage = async (event) => {
+          try {
+            const raw = event.data instanceof Blob ? await event.data.text() : event.data;
+            const msg = JSON.parse(raw);
+
+            // 1. Setup Completed -> Ready to stream audio
+            if (msg.setupComplete !== undefined) {
+              setupDone = true;
+              verifiedModelIndex = modelIdx;
+              isConnecting = false;
+              isConversationActive = true;
+              currentInputTranscript = "";
+              currentOutputTranscript = "";
+              currentInputLangCode = "";
+              currentOutputLangCode = "";
+              turnResetPending = false;
+              speakerState.textContent = "聞き取り待機中…";
+              updateButtonUI(true, false);
+              setStatus(
+                "ok",
+                "会話中（日本語 ⇔ 多言語 自動判別）",
+                "何語でもそのまま話しかけてください。言語を自動判別して音声と文字で通訳します。"
+              );
+              return;
+            }
+
+            // 2. Server Content (Audio & Transcriptions)
+            const sc = msg.serverContent;
+            if (!sc) return;
+
+            // Handle interruption (barge-in)
+            if (sc.interrupted) {
+              clearPlaybackQueue();
+              turnResetPending = true;
+            }
+
+            // Input Audio Transcription (相手の言葉)
+            if (sc.interimInputTranscription && sc.interimInputTranscription.text) {
+              if (turnResetPending) {
+                currentInputTranscript = "";
+                currentOutputTranscript = "";
+                currentInputLangCode = "";
+                currentOutputLangCode = "";
+                turnResetPending = false;
+              }
+              if (sc.interimInputTranscription.languageCode) {
+                currentInputLangCode = sc.interimInputTranscription.languageCode;
+              }
+              updateSpeakerTranscriptUI(
+                currentInputTranscript + sc.interimInputTranscription.text,
+                currentInputLangCode,
+                true
+              );
+            }
+
+            if (sc.inputTranscription && sc.inputTranscription.text) {
+              if (turnResetPending) {
+                currentInputTranscript = "";
+                currentOutputTranscript = "";
+                currentInputLangCode = "";
+                currentOutputLangCode = "";
+                turnResetPending = false;
+              }
+              if (sc.inputTranscription.languageCode) {
+                currentInputLangCode = sc.inputTranscription.languageCode;
+              }
+              currentInputTranscript += sc.inputTranscription.text;
+              updateSpeakerTranscriptUI(currentInputTranscript.trim(), currentInputLangCode, false);
+            }
+
+            // Output Audio Transcription (自分の返事・文字表示)
+            if (sc.outputTranscription && sc.outputTranscription.text) {
+              if (turnResetPending) {
+                currentOutputTranscript = "";
+                currentOutputLangCode = "";
+                turnResetPending = false;
+              }
+              if (sc.outputTranscription.languageCode) {
+                currentOutputLangCode = sc.outputTranscription.languageCode;
+              }
+              currentOutputTranscript += sc.outputTranscription.text;
+              updateReplyTranscriptUI(currentOutputTranscript.trim(), currentOutputLangCode);
+            }
+
+            // Model Turn Parts (Native Audio chunks + fallback text if any)
+            if (sc.modelTurn && Array.isArray(sc.modelTurn.parts)) {
+              for (const part of sc.modelTurn.parts) {
+                if (part.inlineData && part.inlineData.data) {
+                  playPcm24kChunk(part.inlineData.data);
+                }
+                if (part.text && !sc.outputTranscription) {
+                  currentOutputTranscript += part.text;
+                  updateReplyTranscriptUI(currentOutputTranscript.trim(), currentOutputLangCode);
+                }
+              }
+            }
+
+            if (sc.turnComplete) {
+              turnResetPending = true;
+              speakerState.textContent = "聞き取り待機中…";
+            }
+          } catch (err) {
+            // Ignore malformed message
+          }
+        };
+
+        activeWs.onerror = () => {
+          // Detailed reason handled in onclose
+        };
+
+        activeWs.onclose = (event) => {
+          const reasonLower = (event.reason || "").toLowerCase();
+          const isAuthFail = /api_key_invalid|api key not valid|invalid api key|permission_denied/.test(reasonLower);
+
+          // If setup failed because of model mismatch, try fallback model automatically
+          if (!setupDone && !isAuthFail && modelIdx + 1 < LIVE_MODELS.length) {
+            stopConversation(true);
+            startConversation(modelIdx + 1);
+            return;
+          }
+
+          stopConversation(true);
+          setStatus(
+            "error",
+            "接続が切断されました",
+            explainCloseOrError(event.code, event.reason)
+          );
+        };
+      }
+
+      // Event Listeners
+      talkButton.addEventListener("click", () => {
+        if (isConversationActive || isConnecting) {
+          stopConversation(false);
+        } else {
+          startConversation(verifiedModelIndex);
+        }
+      });
+
+      // Save key to localStorage & immediately attempt connection on paste/input
+      let inputDebounceTimer = null;
+      function handleKeyInputChanged(immediate = false) {
+        const key = (apiKeyInput.value || "").trim();
+        try {
+          if (key) {
+            localStorage.setItem(STORAGE_KEY, key);
+          } else {
+            localStorage.removeItem(STORAGE_KEY);
+          }
+        } catch (_) {}
+
+        if (inputDebounceTimer) {
+          clearTimeout(inputDebounceTimer);
+        }
+
+        if (immediate) {
+          testConnectionWithKey(key, 0);
+        } else {
+          inputDebounceTimer = setTimeout(() => {
+            testConnectionWithKey(key, 0);
+          }, 350);
+        }
+      }
+
+      apiKeyInput.addEventListener("paste", () => {
+        setTimeout(() => handleKeyInputChanged(true), 20);
+      });
+
+      apiKeyInput.addEventListener("input", () => {
+        handleKeyInputChanged(false);
+      });
+
+      toggleKeyVisBtn.addEventListener("click", () => {
+        if (apiKeyInput.type === "password") {
+          apiKeyInput.type = "text";
+          toggleKeyVisBtn.textContent = "隠す";
+        } else {
+          apiKeyInput.type = "password";
+          toggleKeyVisBtn.textContent = "表示";
+        }
+      });
+
+      clearKeyBtn.addEventListener("click", () => {
+        if (isConversationActive || isConnecting) {
+          stopConversation(true);
+        }
+        apiKeyInput.value = "";
+        try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+        testConnectionWithKey("", 0);
+      });
+
+      // Restore key from localStorage on load and test connection automatically
+      try {
+        const savedKey = localStorage.getItem(STORAGE_KEY);
+        if (savedKey) {
+          apiKeyInput.value = savedKey;
+          testConnectionWithKey(savedKey, 0);
+        }
+      } catch (_) {}
+    })();
+  </script>
+</body>
+</html>
